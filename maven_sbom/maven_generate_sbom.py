@@ -1,43 +1,38 @@
 import subprocess
 from pathlib import Path
-import shutil
-
 from maven_sbom.maven_setup import get_mvn_path
 
 
-def run_maven_sbom(repo_path: Path, mvn_bin: str | Path | None = None):
+def run_maven_sbom(pom_dir: Path, output_file: Path, mvn_bin: str | Path | None = None):
     """
-    Run Maven CycloneDX plugin to generate SBOM in JSON format.
+    Run Maven CycloneDX plugin to generate SBOM in JSON format directly
+    at the specified output_file path (repo root with custom name).
     """
     mvn_path = Path(mvn_bin) if mvn_bin else get_mvn_path()
     if not mvn_path.exists():
         raise FileNotFoundError(f"❌ Maven binary not found: {mvn_path}")
 
+    # Prepare command
     cmd = [
         str(mvn_path),
         "org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeAggregateBom",
-        "-DoutputFormat=json"
+        "-DoutputFormat=json",
+        f"-DoutputDirectory={output_file.parent}",
+        f"-DoutputName={output_file.stem}"  # filename without extension
     ]
 
     print(f"🔧 Maven binary path: {mvn_path}")
-    print(f"📁 Working directory: {repo_path}")
-    print(f"📦 Running command: {' '.join(cmd)}")
+    print(f"📁 POM directory: {pom_dir}")
+    print(f"📦 Generating SBOM at: {output_file}")
+    print(f"📄 Running command: {' '.join(cmd)}")
 
-    subprocess.run(cmd, cwd=repo_path, check=True)
+    subprocess.run(cmd, cwd=pom_dir, check=True)
 
+    # Verify
+    if not output_file.exists():
+        raise FileNotFoundError(f"❌ SBOM generation failed: {output_file}")
 
-def copy_sbom(module_dir: Path, output_path: Path):
-    """
-    Copies the generated SBOM from module_dir/target/bom.json
-    to the specified output_path (e.g., repo_root/sbom_1.json).
-    """
-    source = module_dir / "target" / "bom.json"
-    if not source.exists():
-        raise FileNotFoundError(f"❌ SBOM not found at {source}")
-
-    shutil.copyfile(source, output_path)
-    return output_path
-
+    return output_file
 
 def run_maven_dependency_tree(module_dir: Path, mvn_bin: str | Path | None = None, output_file: Path | str = "deps.txt"):
     """

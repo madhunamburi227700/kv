@@ -14,7 +14,7 @@ from python_sbom.python_compare import compare as compare_python
 
 # Java
 from maven_sbom.maven_setup import get_mvn_path
-from maven_sbom.maven_generate_sbom import run_maven_sbom, copy_sbom, run_maven_dependency_tree
+from maven_sbom.maven_generate_sbom import run_maven_sbom,run_maven_dependency_tree
 from maven_sbom.maven_generate_dependency_tree import parse_gradle_dependencies, save_dependencies_to_json
 from maven_sbom.maven_comapre import compare_sbom_and_tree
 
@@ -68,6 +68,7 @@ def process_java(repo_path, java_files):
 
     print(f"\n✅ Using Maven: {mvn_path}")
 
+    # Filter valid POMs (skip test/examples folders)
     valid_poms = [f for f in java_files if "test" not in f.lower() and "examples" not in f.lower()]
     print(f"\n📦 Processing {len(valid_poms)} Java POM(s)")
 
@@ -76,16 +77,21 @@ def process_java(repo_path, java_files):
         print(f"\n🚀 Processing Java POM #{idx}: {pom_file}")
 
         try:
-            run_maven_sbom(pom_dir, mvn_bin=mvn_path)
-            sbom_file = copy_sbom(pom_dir, output_path=Path(repo_path) / f"java_sbom_{idx}.json")
+            # Generate SBOM directly in repo root
+            sbom_file = Path(repo_path) / f"java_sbom_{idx}.json"
+            run_maven_sbom(pom_dir, output_file=sbom_file, mvn_bin=mvn_path)
             print(f"✅ SBOM generated → {sbom_file}")
 
+            # Generate dependency tree
             deps_txt = Path(repo_path) / f"java_deps_{idx}.txt"
             run_maven_dependency_tree(pom_dir, mvn_bin=mvn_path, output_file=deps_txt)
+
+            # Parse dependency tree to JSON
             deps_json = Path(repo_path) / f"java_deps_{idx}.json"
             parsed = parse_gradle_dependencies(str(deps_txt))
             save_dependencies_to_json(parsed, str(deps_json))
 
+            # Compare SBOM vs dependency tree
             comparison_file = Path(repo_path) / f"java_comparison_{idx}.txt"
             compare_sbom_and_tree(str(sbom_file), str(deps_json), str(comparison_file))
             print(f"✅ Comparison completed → {comparison_file}")
