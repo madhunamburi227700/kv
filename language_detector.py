@@ -2,26 +2,32 @@ import os
 from pathlib import Path
 from collections import defaultdict
 
-# -------------------- TOML Loader --------------------
-try:
-    import tomllib  # Python >=3.11
-except ImportError:
-    import tomli as tomllib  # Python <3.11 fallback
-
 # -------------------- Constants --------------------
-LANGUAGE_EXTENSIONS = {
-    ".py": "Python", ".java": "Java", ".go": "Go", ".js": "JavaScript",
-    ".ts": "TypeScript", ".rb": "Ruby", ".php": "PHP", ".cpp": "C++",
-    ".c": "C", ".cs": "C#", ".rs": "Rust", ".kt": "Kotlin", ".swift": "Swift",
-    ".scala": "Scala", ".sh": "Shell",
-}
 EXCLUDE_DIRS = {".venv", "venv", "env", "__pycache__", "node_modules", "dist",
                 "target", "build", "site-packages"}
+
+# Map extensions to languages
+LANGUAGE_EXTENSIONS = {
+    ".py": "Python",
+    ".java": "Java",
+    ".go": "Go",
+    ".js": "JavaScript",
+    ".ts": "TypeScript",
+    ".rb": "Ruby",
+    ".php": "PHP",
+    ".cpp": "C++",
+    ".c": "C",
+    ".cs": "C#",
+    ".rs": "Rust",
+    ".kt": "Kotlin",
+    ".swift": "Swift",
+    ".scala": "Scala",
+    ".sh": "Shell",
+}
+
 PYTHON_PRIORITY = ["uv", "poetry", "pipenv", "flit", "pyproject", "setuptools", "pip"]
 
-# ================================================================
-# Language Detection (with dependency manager fallback)
-# ================================================================
+# -------------------- Language Detection --------------------
 def detect_languages(repo_path: str):
     language_stats = defaultdict(int)
     file_details = defaultdict(list)
@@ -36,34 +42,35 @@ def detect_languages(repo_path: str):
         dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
         for file in files:
             _, ext = os.path.splitext(file)
+            fpath = str(Path(root) / file)
+            try:
+                size = os.path.getsize(fpath)
+            except OSError:
+                size = 0
+
+            # Detect code files
             if ext.lower() in LANGUAGE_EXTENSIONS:
                 lang = LANGUAGE_EXTENSIONS[ext.lower()]
-                fpath = str(Path(root) / file)
-                try:
-                    size = os.path.getsize(fpath)
-                except OSError:
-                    size = 0
                 language_stats[lang] += size
                 total_size += size
                 file_details[lang].append(fpath)
 
-            # -------------------- Check package manager files even if no code --------------------
+            # Detect package manager files
             lower_file = file.lower()
-            if lower_file in {"requirements.txt", "setup.py", "pyproject.toml"}:
+            if lower_file in {"requirements.txt", "pyproject.toml"}:
                 detected_package_managers.add("Python")
-                file_details["Python"].append(str(Path(root) / file))
+                file_details["Python"].append(fpath)
             elif lower_file == "go.mod":
                 detected_package_managers.add("Go")
-                file_details["Go"].append(str(Path(root) / file))
-            elif lower_file in {"pom.xml", "build.gradle", "build.gradle.kts"}:
+                file_details["Go"].append(fpath)
+            elif lower_file == "pom.xml":
                 detected_package_managers.add("Java")
-                file_details["Java"].append(str(Path(root) / file))
+                file_details["Java"].append(fpath)
 
-    # Decide primary language
+    # Determine primary language
     if language_stats:
         primary_language = max(language_stats, key=language_stats.get)
     elif detected_package_managers:
-        # Use the first detected package manager language as fallback
         primary_language = next(iter(detected_package_managers))
     else:
         primary_language = "Unknown"
@@ -79,9 +86,8 @@ def detect_languages(repo_path: str):
         "files": dict(file_details),
     }
 
-# ================================================================
-# Dependency Manager Detection
-# ================================================================
+
+# -------------------- Dependency Manager Detection --------------------
 def detect_dependency_manager(repo_path: str, language: str):
     repo_path = Path(repo_path)
     lang = language.lower()
@@ -96,12 +102,14 @@ def detect_dependency_manager(repo_path: str, language: str):
 
             if "requirements.txt" in files_lower:
                 found_files["pip"].append(str(rpath / "requirements.txt"))
-            if "setup.py" in files_lower:
-                found_files["setuptools"].append(str(rpath / "setup.py"))
-
             if "pyproject.toml" in files_lower:
                 py_file = rpath / "pyproject.toml"
                 manager = "pyproject"
+                try:
+                    import tomllib  # Python >=3.11
+                except ImportError:
+                    import tomli as tomllib  # Python <3.11
+
                 try:
                     with open(py_file, "rb") as f:
                         data = tomllib.load(f)
@@ -133,11 +141,10 @@ def detect_dependency_manager(repo_path: str, language: str):
             if "build.gradle.kts" in files:
                 found_files["gradle"].append(str(rpath / "build.gradle.kts"))
 
-        if found_files:
-            if "maven" in found_files:
-                return "maven", found_files["maven"]
-            if "gradle" in found_files:
-                return "gradle", found_files["gradle"]
+        if "maven" in found_files:
+            return "maven", found_files["maven"]
+        if "gradle" in found_files:
+            return "gradle", found_files["gradle"]
         return "Unknown", []
 
     # -------------------- Go --------------------
@@ -145,12 +152,10 @@ def detect_dependency_manager(repo_path: str, language: str):
         go_mods = []
         for root, dirs, files in os.walk(repo_path):
             dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-            rpath = Path(root)
             if "go.mod" in files:
-                go_mods.append(str(rpath / "go.mod"))
+                go_mods.append(str(Path(root) / "go.mod"))
         if go_mods:
             return "go modules", go_mods
         return "Unknown", []
 
-    # -------------------- Default --------------------
     return "Unknown", []

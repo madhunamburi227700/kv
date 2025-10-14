@@ -25,8 +25,9 @@ from go_sbom.go_compare import generate_comparison
 # Language detection module
 from language_detector import detect_languages, detect_dependency_manager
 
-# Package manager file handler
-from package_file_handler import get_package_file
+# Package file handler
+from package_file_handler import get_package_file_auto
+
 
 # -------------------- Python Helper --------------------
 def process_python(env_name, repo_path, manager_name, dep_file, index):
@@ -59,6 +60,7 @@ def process_python(env_name, repo_path, manager_name, dep_file, index):
 
     remove_venv(venv_path)
     print("🧹 Python virtual environment removed.")
+
 
 # -------------------- Java Helper --------------------
 def process_java(repo_path, java_files):
@@ -95,6 +97,7 @@ def process_java(repo_path, java_files):
         except Exception as e:
             print(f"❌ Error processing {pom_file}: {e}")
 
+
 # -------------------- Go Helper --------------------
 def process_go(repo_path, go_files):
     if not go_files:
@@ -119,6 +122,7 @@ def process_go(repo_path, go_files):
 
         print(f"✅ Go comparison completed → {comparison_file}")
 
+
 # -------------------- Main Flow --------------------
 def main():
     print("\n🎯 SBOM Generation Tool (Package File Only)")
@@ -127,39 +131,47 @@ def main():
     print(f"\n🖥️ Detected OS: {os_name}")
 
     # -------------------- Get package manager file --------------------
-    package_file = get_package_file()
+    source_input = input("\n📂 Enter GitHub raw URL or local package file path: ").strip()
+    package_file = get_package_file_auto(source_input)
     print(f"\n📄 Using package file: {package_file}")
 
-    repo_path = Path.cwd()  # Use current directory as "repo path"
+    repo_path = Path.cwd()  # Current directory as repo path
 
-    # -------------------- Detect language based on file --------------------
-    lang_info = detect_languages(str(repo_path))
-    if not lang_info.get("files"):
-        print("⚠️ No dependency manager files detected.")
+    # -------------------- Detect language based on package manager file only --------------------
+    _, ext = os.path.splitext(package_file)
+    ext = ext.lower()
+
+    # Map extension to language
+    if ext in [".py", ".txt", ".toml"]:
+        language = "Python"
+    elif ext == ".go":
+        language = "Go"
+    elif ext == ".xml":
+        language = "Java"
+    else:
+        print(f"⚠️ Unsupported package file type: {ext}")
         return
 
-    for lang, files in lang_info["files"].items():
-        manager, dep_files = detect_dependency_manager(str(repo_path), lang)
-        # If user uploaded a single package file, override dep_files
-        dep_files = [package_file]
+    # Detect dependency manager
+    manager, dep_files = detect_dependency_manager(str(repo_path), language)
 
-        if not dep_files:
-            print(f"⚠️ Skipping {lang}: No dependency manager files found")
-            continue
+    # Override dep_files with user-provided file
+    dep_files = [package_file]
 
-        print(f"\n📦 Processing {lang} with manager: {manager}")
+    print(f"\n📦 Processing {language} with manager: {manager}")
 
-        if lang.lower() == "python":
-            for i, dep_file in enumerate(dep_files, start=1):
-                process_python("python-env", repo_path, manager, dep_file, i)
+    if language.lower() == "python":
+        for i, dep_file in enumerate(dep_files, start=1):
+            process_python("python-env", repo_path, manager, dep_file, i)
 
-        elif lang.lower() == "java":
-            process_java(repo_path, dep_files)
+    elif language.lower() == "java":
+        process_java(repo_path, dep_files)
 
-        elif lang.lower() == "go":
-            process_go(repo_path, dep_files)
+    elif language.lower() == "go":
+        process_go(repo_path, dep_files)
 
     print("\n🎉 SBOM generation completed for all detected languages!")
+
 
 if __name__ == "__main__":
     main()
