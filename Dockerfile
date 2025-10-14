@@ -80,5 +80,12 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
 WORKDIR /app
 COPY . /app
 
+# -------------------- PYTHON DEPENDENCIES --------------------
+# Copy requirements.txt separately first to leverage Docker caching
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+
+# -------------------- RUN MAIN SCRIPT --------------------
 CMD ["python", "main.py"]
 

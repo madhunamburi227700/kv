@@ -2,15 +2,18 @@ import os
 import requests
 import shutil
 from pathlib import Path
+import platform
 
 def get_package_file() -> str:
     """
     Ask user how they want to provide a package manager file:
-    1. GitHub raw file URL
-    2. Local file path
+    1️⃣  GitHub raw file URL
+    2️⃣  Local file path
 
+    Works on Windows, Linux, and macOS.
+    
     Returns:
-        str: Path to the downloaded or local file.
+        str: Absolute path to the downloaded or local file.
     """
     print("\n📦 How would you like to provide the package manager file?")
     print("1️⃣  GitHub raw file link (e.g., https://raw.githubusercontent.com/user/repo/branch/file)")
@@ -19,7 +22,7 @@ def get_package_file() -> str:
     choice = input("👉 Enter choice (1 or 2): ").strip()
 
     # -----------------------------
-    # Option 1: GitHub raw URL
+    # OPTION 1: GitHub Raw URL
     # -----------------------------
     if choice == "1":
         raw_url = input("🔗 Enter GitHub raw file URL: ").strip()
@@ -31,9 +34,10 @@ def get_package_file() -> str:
         if not filename:
             raise ValueError("❌ Could not determine filename from URL")
 
+        # Normalize path using Pathlib (cross-platform)
         local_path = Path.cwd() / filename
-        print(f"⬇️ Downloading file from: {raw_url}")
 
+        print(f"⬇️ Downloading file from: {raw_url}")
         try:
             response = requests.get(raw_url, timeout=20)
             response.raise_for_status()
@@ -47,11 +51,19 @@ def get_package_file() -> str:
         return str(local_path.resolve())
 
     # -----------------------------
-    # Option 2: Local file
+    # OPTION 2: Local File
     # -----------------------------
     elif choice == "2":
         local_input = input("📂 Enter full local file path: ").strip()
+
+        # Expand ~ and resolve relative paths
         local_file = Path(local_input).expanduser().resolve()
+
+        # Handle OS-specific path normalization
+        if platform.system() == "Windows":
+            local_file = Path(os.path.normpath(str(local_file)))
+        else:
+            local_file = Path(os.path.abspath(local_file))
 
         if not local_file.exists():
             raise FileNotFoundError(f"❌ File not found: {local_file}")

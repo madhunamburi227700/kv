@@ -1,9 +1,7 @@
 import os
-import sys
 from pathlib import Path
 
 from os_detect import detect_os
-from git_repo import clone_and_checkout
 
 # Python SBOM
 from python_sbom.python_venv_manager import setup as setup_venv, remove_venv
@@ -26,6 +24,9 @@ from go_sbom.go_compare import generate_comparison
 
 # Language detection module
 from language_detector import detect_languages, detect_dependency_manager
+
+# Package manager file handler
+from package_file_handler import get_package_file
 
 # -------------------- Python Helper --------------------
 def process_python(env_name, repo_path, manager_name, dep_file, index):
@@ -68,7 +69,6 @@ def process_java(repo_path, java_files):
 
     print(f"\n✅ Using Maven: {mvn_path}")
 
-    # Filter valid POMs (skip test/examples folders)
     valid_poms = [f for f in java_files if "test" not in f.lower() and "examples" not in f.lower()]
     print(f"\n📦 Processing {len(valid_poms)} Java POM(s)")
 
@@ -121,20 +121,18 @@ def process_go(repo_path, go_files):
 
 # -------------------- Main Flow --------------------
 def main():
-    repo_with_branch = input(
-        "Enter GitHub repo URL with branch (e.g. https://github.com/user/repo.git@branch): "
-    ).strip()
-    if not repo_with_branch:
-        print("❌ Repo URL required.")
-        return
+    print("\n🎯 SBOM Generation Tool (Package File Only)")
 
     os_name = detect_os()
     print(f"\n🖥️ Detected OS: {os_name}")
 
-    repo_path = Path(clone_and_checkout(repo_with_branch))
-    print(f"\n➡ Repo cloned at: {repo_path}")
+    # -------------------- Get package manager file --------------------
+    package_file = get_package_file()
+    print(f"\n📄 Using package file: {package_file}")
 
-    # -------------------- Detect languages based on code + package manager files --------------------
+    repo_path = Path.cwd()  # Use current directory as "repo path"
+
+    # -------------------- Detect language based on file --------------------
     lang_info = detect_languages(str(repo_path))
     if not lang_info.get("files"):
         print("⚠️ No dependency manager files detected.")
@@ -142,6 +140,9 @@ def main():
 
     for lang, files in lang_info["files"].items():
         manager, dep_files = detect_dependency_manager(str(repo_path), lang)
+        # If user uploaded a single package file, override dep_files
+        dep_files = [package_file]
+
         if not dep_files:
             print(f"⚠️ Skipping {lang}: No dependency manager files found")
             continue
