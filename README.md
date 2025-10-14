@@ -1,4 +1,4 @@
-# mono-repo-sbom-generator
+# Sbom-generator
 
 - this tool helps in generating Software Bill of Materials (SBOM) for multi-module projects. right it gave supports for         java-maven,python,golang projects.
 - it generates SBOM in cyclonedx format.
