@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 def load_dependency_tree(path):
-    """Load only direct dependencies from deptree output (deps.json)."""
+    """Load all dependencies from deptree output (direct + indirect)."""
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"{path} does not exist")
@@ -13,7 +13,6 @@ def load_dependency_tree(path):
     if not content:
         raise ValueError(f"Dependency tree file {path} is empty")
 
-    # Strip logs before first '{'
     if "{" in content:
         content = content[content.index("{"):]
     else:
@@ -29,12 +28,24 @@ def load_dependency_tree(path):
     if not isinstance(data, dict) or "packages" not in data:
         raise ValueError(f"Unexpected JSON format in {path}, expected {{'packages': [...]}}")
 
-    for pkg in data["packages"]:
-        # Add only the package itself, ignore children (direct dependencies only)
+    def extract(pkg):
+        """Recursively extract all packages (direct + indirect)."""
+        if isinstance(pkg, str):
+            if "@" in pkg:
+                lib, version = pkg.rsplit("@", 1)
+                deps[lib] = version
+            return
+
         name = pkg.get("name")
         if name and "@" in name:
             lib, version = name.rsplit("@", 1)
             deps[lib] = version
+
+        for child in pkg.get("children", []):
+            extract(child)
+
+    for pkg in data["packages"]:
+        extract(pkg)
 
     return deps
 

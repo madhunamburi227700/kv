@@ -5,29 +5,29 @@ from pathlib import Path
 from os_detect import detect_os
 from git_repo import clone_and_checkout
 
-# Python
+# Python SBOM
 from python_sbom.python_venv_manager import setup as setup_venv, remove_venv
 from python_sbom.python_deps import install_dependencies
 from python_sbom.python_dep_convert import convert_json
 from python_sbom.python_generate_sbom import generate_sbom
 from python_sbom.python_compare import compare as compare_python
 
-# Java
+# Java SBOM
 from maven_sbom.maven_setup import get_mvn_path
-from maven_sbom.maven_generate_sbom import run_maven_sbom,run_maven_dependency_tree
+from maven_sbom.maven_generate_sbom import run_maven_sbom, run_maven_dependency_tree
 from maven_sbom.maven_generate_dependency_tree import parse_gradle_dependencies, save_dependencies_to_json
 from maven_sbom.maven_comapre import compare_sbom_and_tree
 
-# Go
+# Go SBOM
 from go_sbom.golang_check import is_golang_project
 from go_sbom.go_dependency_tree import prepare_dependencies, install_deptree, generate_dependency_tree
 from go_sbom.golang_sbom_generator import generate_sbom as generate_go_sbom
 from go_sbom.go_compare import generate_comparison
 
+# Language detection module
 from language_detector import detect_languages, detect_dependency_manager
 
-
-# -------------------- Helper Functions --------------------
+# -------------------- Python Helper --------------------
 def process_python(env_name, repo_path, manager_name, dep_file, index):
     print(f"\n{'='*60}")
     print(f"▶ Processing Python ({manager_name}) → {dep_file}")
@@ -59,7 +59,7 @@ def process_python(env_name, repo_path, manager_name, dep_file, index):
     remove_venv(venv_path)
     print("🧹 Python virtual environment removed.")
 
-
+# -------------------- Java Helper --------------------
 def process_java(repo_path, java_files):
     mvn_path = get_mvn_path()
     if not mvn_path:
@@ -77,21 +77,17 @@ def process_java(repo_path, java_files):
         print(f"\n🚀 Processing Java POM #{idx}: {pom_file}")
 
         try:
-            # Generate SBOM directly in repo root
             sbom_file = Path(repo_path) / f"java_sbom_{idx}.json"
             run_maven_sbom(pom_dir, output_file=sbom_file, mvn_bin=mvn_path)
             print(f"✅ SBOM generated → {sbom_file}")
 
-            # Generate dependency tree
             deps_txt = Path(repo_path) / f"java_deps_{idx}.txt"
             run_maven_dependency_tree(pom_dir, mvn_bin=mvn_path, output_file=deps_txt)
 
-            # Parse dependency tree to JSON
             deps_json = Path(repo_path) / f"java_deps_{idx}.json"
             parsed = parse_gradle_dependencies(str(deps_txt))
             save_dependencies_to_json(parsed, str(deps_json))
 
-            # Compare SBOM vs dependency tree
             comparison_file = Path(repo_path) / f"java_comparison_{idx}.txt"
             compare_sbom_and_tree(str(sbom_file), str(deps_json), str(comparison_file))
             print(f"✅ Comparison completed → {comparison_file}")
@@ -99,7 +95,7 @@ def process_java(repo_path, java_files):
         except Exception as e:
             print(f"❌ Error processing {pom_file}: {e}")
 
-
+# -------------------- Go Helper --------------------
 def process_go(repo_path, go_files):
     if not go_files:
         print("⚠️ No Go modules found.")
@@ -108,30 +104,20 @@ def process_go(repo_path, go_files):
     print(f"\n📦 Detected {len(go_files)} Go module(s)")
 
     root_folder = Path.cwd()
-
-    # Install dependency tree tool once
     install_deptree()
 
     for idx, go_mod in enumerate(go_files, start=1):
         mod_path = Path(go_mod).parent
-
-        # Prepare module (run go mod tidy etc.)
         prepare_dependencies(mod_path)
 
         print(f"\n🚀 Processing Go module #{idx}: {mod_path}")
 
-        # Generate dependency tree
         deps_file = generate_dependency_tree(mod_path, root_folder, output_name=f"go_deps_{idx}.json")
-
-        # Generate SBOM
         sbom_file = generate_go_sbom(mod_path, root_folder, output_name=f"go_sbom_{idx}.json")
-
-        # Generate comparison
         comparison_file = root_folder / f"go_comparison_{idx}.txt"
         generate_comparison(deps_file, sbom_file, comparison_file)
 
         print(f"✅ Go comparison completed → {comparison_file}")
-
 
 # -------------------- Main Flow --------------------
 def main():
@@ -148,19 +134,16 @@ def main():
     repo_path = Path(clone_and_checkout(repo_with_branch))
     print(f"\n➡ Repo cloned at: {repo_path}")
 
+    # -------------------- Detect languages based on code + package manager files --------------------
     lang_info = detect_languages(str(repo_path))
-    if not lang_info.get("languages"):
-        print("⚠️ No languages detected.")
+    if not lang_info.get("files"):
+        print("⚠️ No dependency manager files detected.")
         return
-
-    print("\n📊 Languages detected:")
-    for lang, pct in lang_info["languages"].items():
-        print(f" - {lang}: {pct}%")
 
     for lang, files in lang_info["files"].items():
         manager, dep_files = detect_dependency_manager(str(repo_path), lang)
         if not dep_files:
-            print(f"⚠️ Skipping {lang}: Unknown dependency manager or no files")
+            print(f"⚠️ Skipping {lang}: No dependency manager files found")
             continue
 
         print(f"\n📦 Processing {lang} with manager: {manager}")
@@ -173,14 +156,9 @@ def main():
             process_java(repo_path, dep_files)
 
         elif lang.lower() == "go":
-            # Updated Go processing
             process_go(repo_path, dep_files)
 
-        else:
-            print(f"⚠️ Skipping {lang}: Flow not implemented")
-
     print("\n🎉 SBOM generation completed for all detected languages!")
-
 
 if __name__ == "__main__":
     main()

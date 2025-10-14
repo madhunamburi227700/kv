@@ -20,12 +20,13 @@ EXCLUDE_DIRS = {".venv", "venv", "env", "__pycache__", "node_modules", "dist",
 PYTHON_PRIORITY = ["uv", "poetry", "pipenv", "flit", "pyproject", "setuptools", "pip"]
 
 # ================================================================
-# Language Detection
+# Language Detection (with dependency manager fallback)
 # ================================================================
 def detect_languages(repo_path: str):
     language_stats = defaultdict(int)
     file_details = defaultdict(list)
     total_size = 0
+    detected_package_managers = set()
 
     repo_path = Path(repo_path)
     if not repo_path.exists():
@@ -46,10 +47,26 @@ def detect_languages(repo_path: str):
                 total_size += size
                 file_details[lang].append(fpath)
 
-    if not language_stats:
-        primary_language = "Unknown"
-    else:
+            # -------------------- Check package manager files even if no code --------------------
+            lower_file = file.lower()
+            if lower_file in {"requirements.txt", "setup.py", "pyproject.toml"}:
+                detected_package_managers.add("Python")
+                file_details["Python"].append(str(Path(root) / file))
+            elif lower_file == "go.mod":
+                detected_package_managers.add("Go")
+                file_details["Go"].append(str(Path(root) / file))
+            elif lower_file in {"pom.xml", "build.gradle", "build.gradle.kts"}:
+                detected_package_managers.add("Java")
+                file_details["Java"].append(str(Path(root) / file))
+
+    # Decide primary language
+    if language_stats:
         primary_language = max(language_stats, key=language_stats.get)
+    elif detected_package_managers:
+        # Use the first detected package manager language as fallback
+        primary_language = next(iter(detected_package_managers))
+    else:
+        primary_language = "Unknown"
 
     percentages = {
         lang: round((size / total_size) * 100, 2) if total_size > 0 else 0

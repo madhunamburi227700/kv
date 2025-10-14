@@ -45,6 +45,7 @@ def compare(sbom_file, deps_file, output_file="comparison.txt"):
     deps = load_deps(deps_file)
 
     missing_in_sbom = []
+    missing_in_deps = []
     version_mismatches = []
     exact_matches = []
 
@@ -57,9 +58,16 @@ def compare(sbom_file, deps_file, output_file="comparison.txt"):
         else:
             exact_matches.append((pkg, dep_ver))
 
+    # Check for packages in SBOM but missing in deps
+    for pkg in sbom:
+        if pkg not in deps:
+            missing_in_deps.append(pkg)
+
     with open(output_file, "w", encoding="utf-8") as f:
         f.write("====== Missing in SBOM ========\n")
         f.write("\n".join(f"- {pkg}" for pkg in missing_in_sbom) or "None")
+        f.write("\n\n====== Missing in Dependency File ========\n")
+        f.write("\n".join(f"- {pkg}" for pkg in missing_in_deps) or "None")
         f.write("\n\n====== Version mismatches ========\n")
         f.write("\n".join(f"- {pkg}: deps={dep_v}, sbom={sbom_v}" 
                           for pkg, dep_v, sbom_v in version_mismatches) or "None")
@@ -67,4 +75,3 @@ def compare(sbom_file, deps_file, output_file="comparison.txt"):
         f.write("\n".join(f"- {pkg}: {ver}" for pkg, ver in exact_matches) or "None")
 
     print(f"Comparison results saved in '{output_file}'")
-
