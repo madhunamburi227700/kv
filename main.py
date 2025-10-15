@@ -102,26 +102,25 @@ def process_go(repo_path, go_files):
         return
 
     # Count unique directories
-    processed_dirs = set()
-    for file_path in go_files:
-        processed_dirs.add(str(Path(file_path).parent))
-    print(f"\n📦 Detected {len(processed_dirs)} Go module(s)")
-
-    # Process each unique directory containing at least one Go module file
     processed_dirs_set = set()
+    unique_dirs = []
     for file_path in go_files:
         mod_path = Path(file_path).parent
-        if mod_path in processed_dirs_set:
-            continue
-        processed_dirs_set.add(mod_path)
+        if mod_path not in processed_dirs_set:
+            processed_dirs_set.add(mod_path)
+            unique_dirs.append(mod_path)
 
-        # Check if at least go.mod exists
+    print(f"\n📦 Detected {len(unique_dirs)} Go module(s)")
+
+    # Process each unique directory
+    for idx, mod_path in enumerate(unique_dirs, start=1):
+        # At least go.mod should exist
         if not (mod_path / "go.mod").exists():
             print(f"⚠️ Skipping {mod_path} (missing go.mod)")
             continue
 
         print(f"\n🚀 Processing Go module: {mod_path}")
-        sbom_file = generate_go_sbom(mod_path, Path.cwd(), output_name=f"go_sbom_{mod_path.name}.json")
+        sbom_file = generate_go_sbom(mod_path, Path.cwd(), index=idx)
         print(f"✅ SBOM generated → {sbom_file}")
 
 
