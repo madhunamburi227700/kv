@@ -36,19 +36,14 @@ The pipeline supports the following **Python dependency managers**:
 
 ## How to Use
 
-- **Step 1:** Clone this repository and navigate into it:
-```bash
-git clone https://github.com/your-username/your-repo.git
-cd your-repo
-```
-- **Step 2:** Run the main script
+- **Step 1:** Run the main script
 ```bash
 python main.py
 ```
 
-- You will be prompted to enter a GitHub repository URL with branch:
+- You will be prompted to a github url, or system path of the file
 ```bash
-Enter GitHub repo URL with branch (e.g. https://github.com/user/repo.git@branch):
+Enter GitHub repo URL (e.g. https://github.com/user/repo.git) or local file/folder path:
 ```
 
 - The script will automatically:
