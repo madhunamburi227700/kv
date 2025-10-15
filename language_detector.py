@@ -63,6 +63,12 @@ def detect_languages(repo_path: str):
             elif lower_file == "go.mod":
                 detected_package_managers.add("Go")
                 file_details["Go"].append(fpath)
+                # Also check if go.sum exists
+                go_sum = Path(root) / "go.sum"
+                if go_sum.exists():
+                    file_details["Go"].append(str(go_sum))
+                else:
+                    print(f"⚠️ Warning: {root} has go.mod but missing go.sum. Run 'go mod tidy' to generate it.")
             elif lower_file == "pom.xml":
                 detected_package_managers.add("Java")
                 file_details["Java"].append(fpath)
@@ -85,7 +91,6 @@ def detect_languages(repo_path: str):
         "languages": percentages,
         "files": dict(file_details),
     }
-
 
 # -------------------- Dependency Manager Detection --------------------
 def detect_dependency_manager(repo_path: str, language: str):
@@ -149,13 +154,18 @@ def detect_dependency_manager(repo_path: str, language: str):
 
     # -------------------- Go --------------------
     elif lang == "go":
-        go_mods = []
+        go_files = []
         for root, dirs, files in os.walk(repo_path):
             dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-            if "go.mod" in files:
-                go_mods.append(str(Path(root) / "go.mod"))
-        if go_mods:
-            return "go modules", go_mods
+            rpath = Path(root)
+            if (rpath / "go.mod").exists():
+                go_files.append(str(rpath / "go.mod"))
+                if (rpath / "go.sum").exists():
+                    go_files.append(str(rpath / "go.sum"))
+                else:
+                    print(f"⚠️ Warning: {rpath} has go.mod but missing go.sum. Run 'go mod tidy' to generate it.")
+        if go_files:
+            return "go modules", go_files
         return "Unknown", []
 
     return "Unknown", []

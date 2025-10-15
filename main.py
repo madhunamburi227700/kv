@@ -17,10 +17,7 @@ from maven_sbom.maven_generate_dependency_tree import parse_gradle_dependencies,
 from maven_sbom.maven_comapre import compare_sbom_and_tree
 
 # Go SBOM
-from go_sbom.golang_check import is_golang_project
-from go_sbom.go_dependency_tree import prepare_dependencies, install_deptree, generate_dependency_tree
 from go_sbom.golang_sbom_generator import generate_sbom as generate_go_sbom
-from go_sbom.go_compare import generate_comparison
 
 # Language detection module
 from language_detector import detect_languages, detect_dependency_manager
@@ -104,23 +101,28 @@ def process_go(repo_path, go_files):
         print("⚠️ No Go modules found.")
         return
 
-    print(f"\n📦 Detected {len(go_files)} Go module(s)")
+    # Count unique directories
+    processed_dirs = set()
+    for file_path in go_files:
+        processed_dirs.add(str(Path(file_path).parent))
+    print(f"\n📦 Detected {len(processed_dirs)} Go module(s)")
 
-    root_folder = Path.cwd()
-    install_deptree()
+    # Process each unique directory containing at least one Go module file
+    processed_dirs_set = set()
+    for file_path in go_files:
+        mod_path = Path(file_path).parent
+        if mod_path in processed_dirs_set:
+            continue
+        processed_dirs_set.add(mod_path)
 
-    for idx, go_mod in enumerate(go_files, start=1):
-        mod_path = Path(go_mod).parent
-        prepare_dependencies(mod_path)
+        # Check if at least go.mod exists
+        if not (mod_path / "go.mod").exists():
+            print(f"⚠️ Skipping {mod_path} (missing go.mod)")
+            continue
 
-        print(f"\n🚀 Processing Go module #{idx}: {mod_path}")
-
-        deps_file = generate_dependency_tree(mod_path, root_folder, output_name=f"go_deps_{idx}.json")
-        sbom_file = generate_go_sbom(mod_path, root_folder, output_name=f"go_sbom_{idx}.json")
-        comparison_file = root_folder / f"go_comparison_{idx}.txt"
-        generate_comparison(deps_file, sbom_file, comparison_file)
-
-        print(f"✅ Go comparison completed → {comparison_file}")
+        print(f"\n🚀 Processing Go module: {mod_path}")
+        sbom_file = generate_go_sbom(mod_path, Path.cwd(), output_name=f"go_sbom_{mod_path.name}.json")
+        print(f"✅ SBOM generated → {sbom_file}")
 
 
 # -------------------- Main Flow --------------------
@@ -144,7 +146,7 @@ def main():
     # Map extension to language
     if ext in [".py", ".txt", ".toml"]:
         language = "Python"
-    elif ext == ".go":
+    elif ext in [".mod", ".sum"]:
         language = "Go"
     elif ext == ".xml":
         language = "Java"

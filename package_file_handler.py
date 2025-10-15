@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path
 import platform
 import requests
+from urllib.parse import urlparse, unquote
 
 def get_package_file_auto(source: str) -> str:
     """
@@ -13,12 +14,17 @@ def get_package_file_auto(source: str) -> str:
     Returns the absolute path to the file.
     """
     source = source.strip()
-    print(f"📂 Received package file input: {source}")  # <-- NEW LINE
+    print(f"📂 Received package file input: {source}")
 
     # ----------------------------- URL -----------------------------
     if source.lower().startswith(("http://", "https://")):
-        print("🌐 Detected input as URL")  # <-- NEW LINE
-        filename = os.path.basename(source)
+        print("🌐 Detected input as URL")
+
+        # Extract only the last path segment as filename, ignore query params
+        parsed_url = urlparse(source)
+        filename = os.path.basename(parsed_url.path)
+        filename = unquote(filename)  # decode URL-encoded chars
+
         if not filename:
             raise ValueError("❌ Could not determine filename from URL")
 
@@ -37,7 +43,7 @@ def get_package_file_auto(source: str) -> str:
 
     # ----------------------------- Local Path -----------------------------
     else:
-        print("🖥️ Detected input as local file path")  # <-- NEW LINE
+        print("🖥️ Detected input as local file path")
         local_file = Path(source).expanduser().resolve()
         if platform.system() == "Windows":
             local_file = Path(os.path.normpath(str(local_file)))
