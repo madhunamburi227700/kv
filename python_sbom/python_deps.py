@@ -9,7 +9,7 @@ def install_dependencies(env_name, project_path, dep_file, all_dep_path, dets_pa
     based on the detected dependency manager.
     """
     system = platform.system()
-    env_path = os.path.join(os.getcwd(), env_name)
+    env_path = os.path.join(project_path, env_name)
     bin_dir = "Scripts" if system == "Windows" else "bin"
     python_exec = os.path.join(env_path, bin_dir, "python.exe" if system == "Windows" else "python")
     pipgrip_exec = os.path.join(env_path, bin_dir, "pipgrip.exe" if system == "Windows" else "pipgrip")

@@ -3,18 +3,18 @@ import subprocess
 import platform
 
 
-def get_python_exec(env_name):
+def get_python_exec(env_name, project_folder):
     system = platform.system()
     return os.path.join(
-        os.getcwd(),
+        project_folder,
         env_name,
         "Scripts" if system == "Windows" else "bin",
         "python.exe" if system == "Windows" else "python"
     )
 
 
-def generate_sbom(env_name, requirements_file, output_file):
-    python_exec = get_python_exec(env_name)
+def generate_sbom(env_name, project_folder, requirements_file, output_file):
+    python_exec = get_python_exec(env_name, project_folder)
 
     print("\n🔧 Installing cyclonedx-bom in venv...")
     subprocess.run(
@@ -23,7 +23,7 @@ def generate_sbom(env_name, requirements_file, output_file):
     )
 
     cyclonedx_exec = os.path.join(
-        os.getcwd(),
+        project_folder,
         env_name,
         "Scripts" if platform.system() == "Windows" else "bin",
         "cyclonedx-py"

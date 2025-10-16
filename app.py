@@ -52,7 +52,7 @@ def process_python(env_name, output_folder, manager_name, dep_file, index):
         convert_json(dets_file, normalized_file)
 
     if all_dep_file.exists():
-        generate_sbom(env_name, all_dep_file, sbom_file)
+        generate_sbom(env_name, output_folder, all_dep_file, sbom_file)
 
     if normalized_file.exists() and sbom_file.exists():
         compare_python(sbom_file, normalized_file, comparison_file)
@@ -139,8 +139,8 @@ def generate_sbom_api(request: SBOMRequest):
     dep_files = [package_file]
 
     sbom_id = request.id if request.id else str(uuid.uuid4())
-    sbom_folder = Path("app") / sbom_id
-    sbom_folder.mkdir(parents=True, exist_ok=True)
+    sbom_folder = Path.cwd().joinpath(sbom_id)
+    sbom_folder.mkdir(parents=True, exist_ok=False)  ## keep it false to avoid rewriting of same ID as folder.
 
     if language.lower() == "python":
         result = [process_python("python-env", sbom_folder, manager, dep_files[0], 1)]
