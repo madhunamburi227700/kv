@@ -25,6 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     coreutils \
     findutils \
     file \
+    jq \
+    xz-utils \
     && if [ ! -e /bin/sh ]; then ln -s /usr/bin/dash /bin/sh; fi \
     && rm -rf /var/lib/apt/lists/*
 
@@ -46,26 +48,14 @@ RUN curl -fSL https://archive.apache.org/dist/maven/maven-3/$MAVEN_VERSION/binar
     && sed -i '1s|^#!/bin/sh|#!/usr/bin/bash|' /usr/local/apache-maven/bin/mvn \
     && mvn -v
 
-# -------------------- GO 1.24.4 SETUP --------------------
-RUN curl -fSL https://go.dev/dl/go1.24.4.linux-amd64.tar.gz -o /tmp/go.tar.gz \
-    && tar -C /usr/local -xzf /tmp/go.tar.gz \
-    && rm /tmp/go.tar.gz \
-    && ln -s /usr/local/go/bin/go /usr/local/bin/go \
-    && go version
-
-# -------------------- DEPTREE SETUP --------------------
-ENV GOPATH=/root/go
-RUN mkdir -p $GOPATH/bin \
-    && go install github.com/vc60er/deptree@latest \
-    && ln -sf $GOPATH/bin/deptree /usr/local/bin/deptree \
-    && deptree -v || echo "Deptree installed"
-
-# -------------------- CYCLONEDX-GOMOD SETUP --------------------
-RUN mkdir -p $GOPATH/bin \
-    && go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest \
-    && ln -sf $GOPATH/bin/cyclonedx-gomod /usr/local/bin/cyclonedx-gomod \
-    && cyclonedx-gomod version || echo "cyclonedx-gomod installed"
-
+# -------------------- NODE.JS + NPM + CDXGEN --------------------
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g cdxgen \
+    && export PATH="$(npm bin -g):$PATH" \
+    && node -v \
+    && npm -v \
+    && cdxgen -v
 
 # -------------------- UV SETUP (GLOBAL) --------------------
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
@@ -74,18 +64,11 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && chmod +x /usr/local/bin/uv /usr/local/bin/uvx \
     && uv --version
 
-
-
 # -------------------- WORKDIR & COPY --------------------
-WORKDIR /app
-COPY . /app
+WORKDIR /apps
+COPY . /apps
 
-# -------------------- PYTHON DEPENDENCIES --------------------
-# Copy requirements.txt separately first to leverage Docker caching
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
-
+RUN pip install --no-cache-dir fastapi uvicorn pydantic requests python-multipart python-dotenv toml
 
 # -------------------- RUN MAIN SCRIPT --------------------
-CMD ["python", "main.py"]
-
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
