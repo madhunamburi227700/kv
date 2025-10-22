@@ -48,7 +48,7 @@ def process_python(env_name, repo_path, manager_name, dep_file, index):
         print(f"✅ Normalized dependencies saved → {normalized_file}")
 
     if os.path.exists(all_dep_file):
-        generate_sbom(env_name, all_dep_file, sbom_file)
+        generate_sbom(env_name, repo_path, all_dep_file, sbom_file)
         print(f"✅ SBOM generated → {sbom_file}")
 
     if os.path.exists(normalized_file) and os.path.exists(sbom_file):
