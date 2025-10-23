@@ -5,7 +5,7 @@ import platform
 import requests
 from urllib.parse import urlparse, unquote
 
-def get_package_file_auto(source: str) -> str:
+def get_package_file_auto(source: str, dest_folder: Path) -> str:
     """
     Automatically handle package manager file from either:
       - GitHub raw file URL
@@ -14,6 +14,7 @@ def get_package_file_auto(source: str) -> str:
     Returns the absolute path to the file.
     """
     source = source.strip()
+    dest_folder.mkdir(parents=True, exist_ok=True)
     print(f"📂 Received package file input: {source}")
 
     # ----------------------------- URL -----------------------------
@@ -28,7 +29,7 @@ def get_package_file_auto(source: str) -> str:
         if not filename:
             raise ValueError("❌ Could not determine filename from URL")
 
-        local_path = Path.cwd() / filename
+        local_path = dest_folder / filename
         print(f"⬇️ Downloading file from: {source}")
         try:
             response = requests.get(source, timeout=20)
@@ -53,7 +54,7 @@ def get_package_file_auto(source: str) -> str:
         if not local_file.exists():
             raise FileNotFoundError(f"❌ File not found: {local_file}")
 
-        dest_path = Path.cwd() / local_file.name
+        dest_path = dest_folder / local_file.name
         if local_file != dest_path:
             shutil.copy2(local_file, dest_path)
             print(f"✅ Local file copied to: {dest_path}")
