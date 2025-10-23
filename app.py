@@ -1,6 +1,6 @@
 import uuid
 import json
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from pathlib import Path
 import os
@@ -24,7 +24,7 @@ from go_sbom.golang_sbom_generator import generate_sbom as generate_go_sbom
 from language_detector import detect_dependency_manager
 from package_file_handler import get_package_file_auto
 
-app = FastAPI(title="SBOM Generator API", version="1.2.0")
+app = FastAPI(title="SBOM Generator API", version="1.3.0")
 
 # -------------------- In-memory store --------------------
 sbom_store = {}
@@ -140,7 +140,7 @@ def generate_sbom_api(request: SBOMRequest):
 
     sbom_id = request.id if request.id else str(uuid.uuid4())
     sbom_folder = Path.cwd().joinpath(sbom_id)
-    sbom_folder.mkdir(parents=True, exist_ok=False)  ## keep it false to avoid rewriting of same ID as folder.
+    sbom_folder.mkdir(parents=True, exist_ok=False)
 
     if language.lower() == "python":
         result = [process_python("python-env", sbom_folder, manager, dep_files[0], 1)]
@@ -149,13 +149,12 @@ def generate_sbom_api(request: SBOMRequest):
     elif language.lower() == "go":
         result = process_go(sbom_folder, dep_files)
 
-    # Read SBOM as proper JSON
     sbom_contents = []
     for item in result:
         sbom_file = item["sbom_file"]
         try:
             with open(sbom_file, "r", encoding="utf-8") as f:
-                content = json.load(f)  # <--- parse JSON
+                content = json.load(f)
             sbom_contents.append({"file": sbom_file, "content": content})
         except Exception as e:
             sbom_contents.append({"file": sbom_file, "error": str(e)})
@@ -176,20 +175,80 @@ def generate_sbom_api(request: SBOMRequest):
         "message": "🎉 SBOM generation completed successfully"
     }
 
+# -------------------- POST: Upload file and generate SBOM --------------------
+@app.post("/upload_and_generate_sbom")
+async def upload_and_generate_sbom(
+    file: UploadFile = File(...),
+    id: str = Form(None)
+):
+    # Save uploaded file
+    upload_folder = Path.cwd() / "uploaded_files"
+    upload_folder.mkdir(parents=True, exist_ok=True)
+    file_path = upload_folder / file.filename
+
+    with open(file_path, "wb") as f:
+        f.write(await file.read())
+
+    # Determine language
+    _, ext = os.path.splitext(file.filename)
+    ext = ext.lower()
+    if ext in [".py", ".txt", ".toml"]:
+        language = "Python"
+    elif ext in [".mod", ".sum"]:
+        language = "Go"
+    elif ext == ".xml":
+        language = "Java"
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
+
+    sbom_id = id if id else str(uuid.uuid4())
+    sbom_folder = Path.cwd().joinpath(sbom_id)
+    sbom_folder.mkdir(parents=True, exist_ok=False)
+
+    # Process file based on language
+    if language.lower() == "python":
+        result = [process_python("python-env", sbom_folder, None, str(file_path), 1)]
+    elif language.lower() == "java":
+        result = process_java(sbom_folder, [str(file_path)])
+    elif language.lower() == "go":
+        result = process_go(sbom_folder, [str(file_path)])
+
+    sbom_contents = []
+    for item in result:
+        sbom_file = item["sbom_file"]
+        try:
+            with open(sbom_file, "r", encoding="utf-8") as f:
+                content = json.load(f)
+            sbom_contents.append({"file": sbom_file, "content": content})
+        except Exception as e:
+            sbom_contents.append({"file": sbom_file, "error": str(e)})
+
+    sbom_store[sbom_id] = {
+        "language": language,
+        "sbom_files": [item["sbom_file"] for item in result],
+        "folder": str(sbom_folder)
+    }
+
+    return {
+        "id": sbom_id,
+        "language": language,
+        "folder": str(sbom_folder),
+        "sbom_files": sbom_contents,
+        "message": "🎉 SBOM generated from uploaded file successfully"
+    }
+
 # -------------------- GET: Retrieve SBOM --------------------
 @app.get("/generate_sbom/{sbom_id}")
 def get_sbom(sbom_id: str):
     if sbom_id not in sbom_store:
         raise HTTPException(status_code=404, detail="SBOM ID not found")
-
     sbom_data = sbom_store[sbom_id]
-    sbom_files = sbom_data.get("sbom_files", [])
 
     sbom_contents = []
-    for sbom_file in sbom_files:
+    for sbom_file in sbom_data.get("sbom_files", []):
         try:
             with open(sbom_file, "r", encoding="utf-8") as f:
-                content = json.load(f)  # <--- parse JSON
+                content = json.load(f)
             sbom_contents.append({"file": sbom_file, "content": content})
         except Exception as e:
             sbom_contents.append({"file": sbom_file, "error": str(e)})
@@ -197,7 +256,6 @@ def get_sbom(sbom_id: str):
     return {
         "id": sbom_id,
         "language": sbom_data.get("language"),
-        "os": sbom_data.get("os"),
         "folder": sbom_data.get("folder"),
         "sbom_files": sbom_contents,
         "message": "✅ SBOM files retrieved successfully"
