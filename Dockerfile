@@ -64,11 +64,22 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && chmod +x /usr/local/bin/uv /usr/local/bin/uvx \
     && uv --version
 
-# -------------------- WORKDIR & COPY --------------------
+# -------------------- WORKDIR --------------------
 WORKDIR /apps
-COPY . /apps
 
-RUN pip install --no-cache-dir fastapi uvicorn pydantic requests python-multipart python-dotenv toml
+# -------------------- COPY DEPENDENCY FILES FIRST --------------------
+COPY pyproject.toml README.md ./
+COPY go_sbom/ ./go_sbom/
+COPY maven_sbom/ ./maven_sbom/
+COPY python_sbom/ ./python_sbom/
+
+# -------------------- INSTALL DEPENDENCIES --------------------
+
+RUN uv pip install --system .
+
+# -------------------- COPY REMAINING SOURCE CODE --------------------
+COPY . .
+
 
 # -------------------- RUN MAIN SCRIPT --------------------
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
