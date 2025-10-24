@@ -32,11 +32,11 @@ def process_python(env_name, repo_path, manager_name, dep_file, index):
     print(f"▶ Processing Python ({manager_name}) → {dep_file}")
     print(f"{'='*60}\n")
 
-    all_dep_file = f"python_all-dep_{index}.txt"
-    dets_file = f"python_dets_{index}.json"
-    normalized_file = f"python_normalized_deps_{index}.json"
-    sbom_file = f"python_sbom_{index}.json"
-    comparison_file = f"python_comparison_{index}.txt"
+    all_dep_file = repo_path /f"python_all-dep_{index}.txt"
+    dets_file = repo_path /f"python_dets_{index}.json"
+    normalized_file = repo_path /f"python_normalized_deps_{index}.json"
+    sbom_file = repo_path /f"python_sbom_{index}.json"
+    comparison_file = repo_path /f"python_comparison_{index}.txt"
 
     venv_path = setup_venv(env_name=env_name, project_path=repo_path)
     print(f"➡ Virtual environment created at: {venv_path}")
@@ -120,23 +120,29 @@ def process_go(repo_path, go_files):
             continue
 
         print(f"\n🚀 Processing Go module: {mod_path}")
-        sbom_file = generate_go_sbom(mod_path, Path.cwd(), index=idx)
+        sbom_file = generate_go_sbom(mod_path, repo_path, index=idx)
         print(f"✅ SBOM generated → {sbom_file}")
 
 
 # -------------------- Main Flow --------------------
-def main():
+def main(sbom_id: str):
     print("\n🎯 SBOM Generation Tool (Package File Only)")
 
     os_name = detect_os()
     print(f"\n🖥️ Detected OS: {os_name}")
 
+    # Create root folder for this SBOM ID
+    root_folder = Path.cwd() / sbom_id
+    os.makedirs(root_folder, exist_ok=True)
+    print(f"\n📂 All files will be generated inside: {root_folder}")
+
     # -------------------- Get package manager file --------------------
     source_input = input("\n📂 Enter GitHub raw URL or local package file path: ").strip()
-    package_file = get_package_file_auto(source_input)
+    dest_folder = root_folder
+    package_file = get_package_file_auto(source_input, dest_folder)
     print(f"\n📄 Using package file: {package_file}")
 
-    repo_path = Path.cwd()  # Current directory as repo path
+    repo_path = root_folder  # Use the SBOM ID folder as working path
 
     # -------------------- Detect language based on package manager file only --------------------
     _, ext = os.path.splitext(package_file)
@@ -175,4 +181,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sbom_id = input("Enter SBOM ID: ").strip()
+    main(sbom_id)
