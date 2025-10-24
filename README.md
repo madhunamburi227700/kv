@@ -1,242 +1,151 @@
-# mono-repo-sbom-generator
+# SBOM Generator cli based
 
-- this tool helps in generating Software Bill of Materials (SBOM) for multi-module projects. right it gave supports for         java-maven,python,golang projects.
-- it generates SBOM in cyclonedx format.
-- it also generates dependency tree for maven projects and compare it with generated SBOM.
-- it is dockerized application and can be run using docker.
+A comprehensive tool for generating Software Bill of Materials (SBOM) for multi-language projects, supporting Python, Java (Maven), and Go. The tool generates SBOM in CycloneDX format and provides dependency analysis.
 
-# 1. Features of python
+## 🌟 Key Features
 
-- This repository provides a **Python pipeline** to handle dependency management and SBOM generation efficiently.
+- Multi-language support (Python, Java-Maven, Go)
+- CycloneDX format SBOM generation
+- Dependency tree generation and comparison
+- Support for both local files and GitHub raw URLs
+- Dockerized application for easy deployment
 
-## Features
+## 📝 Input Methods
 
-- **Create isolated virtual environments** for your projects.
-- **Install dependencies** from multiple Python dependency files (`pyproject.toml` or `requirements.txt`).
-- **Generate a full dependency tree** (`dets.json`) and **normalized dependency file** (`normalized_deps.json`).
-- **Produce a Software Bill of Materials (SBOM)** in **CycloneDX format** (`sbom.json`).
+You can provide dependency files in two ways:
 
+1. **GitHub Raw URL**:
+```bash
+https://raw.githubusercontent.com/username/repo/branch/requirements.txt
+https://raw.githubusercontent.com/username/repo/branch/pom.xml
+https://raw.githubusercontent.com/username/repo/branch/go.mod
+```
 
-## Supported Python Package Managers
+2. **Local File Path**:
+```bash
+C:\Projects\my-python-project\requirements.txt
+C:\Projects\my-java-project\pom.xml
+C:\Projects\my-go-project\go.mod
+```
 
-The pipeline supports the following **Python dependency managers**:
+## 🔧 Language-Specific Features
 
-- pip : via requirements.txt
-- Poetry/uv : via pyproject.toml (all extras supported)
-- ⚠️ Only Python projects are supported. Other languages are ignored.
+### 1. Python Support
+- **Input Files**: `requirements.txt`, `pyproject.toml`
+- **Virtual Environment**: Automatic creation using `uv`
+- **Output Files**:
+  - `all-dep_X.txt` - Flattened dependencies
+  - `dets_X.json` - Dependency tree
+  - `normalized_deps_X.json` - Structured dependencies
+  - `sbom_X.json` - CycloneDX SBOM
 
-## Requirements
+### 2. Java (Maven) Support
+- **Input File**: `pom.xml`
+- **Multi-module Support**: Yes
+- **Output Files**:
+  - `java_sbom_X.json` - CycloneDX SBOM
+  - `java_deps_X.json` - Dependency tree
+  - `java_comparison_X.txt` - Comparison report
 
-- Python 3.11+ recommended
+### 3. Go Support
+- **Input Files**: `go.mod`
+- **Multi-module Support**: Yes
+- **Output Files**:
+  - `go_cdxgen_sbom_X.json` - cdxgen based sbom
+  - `go_cdxgen_jq_sbom_1.json` - jq is used to update the sbom to human-readable format
 
-- uv
- (used to create virtual environments and manage Python packages)
+## 🚀 Quick Start
 
-- Git (for cloning repositories)
+### using the cli
 
-## How to Use
-
-- **Step 1:** Run the main script
 ```bash
 python main.py
 ```
 
-- You will be prompted to a github url, or system path of the file
-```bash
-Enter GitHub repo URL (e.g. https://github.com/user/repo.git) or local file/folder path:
-```
-
-- The script will automatically:
-- Detect your OS.
-- Clone the repo.
-- Detect the primary language.
-- Detect Python dependency manager(s) and files.
-- Process each dependency file:
-
-## Step 3: What happens for each dependency file
-
-For each detected Python dependency file, the pipeline performs the following steps:
-
-### 1. Create a Virtual Environment
-- Default environment name: `sbom-env_x`
-- Uses:  
-```bash
-uv venv <env_path>
-```
-### 2. Install Dependencies and Generate Dependency Tree
-
-- Resolves all transitive dependencies using pipgrip.
-- Generates the following files:
-- all-dep_X.txt → Flattened list of dependencies
-- dets_X.json → Detailed dependency tree
-
-### 3. Normalize Dependency Tree
-
-Converts dets_X.json to structured format:
-
--normalized_deps_X.json
-
-### 4. Generate SBOM
-
-Uses cyclonedx-bom for Python
-
-- Generates sbom_X.json
-
-### 5. Cleanup
-
-- Removes the virtual environment after processing
-
-- X in filenames represents the index of the dependency file to avoid overwriting files when multiple dependency files exist.
-
-## Commands Used Internally for Python Projects
-
-| Step                                 | Command                                                                               |
-|--------------------------------------|---------------------------------------------------------------------------------------|
-| Check Python version                 | `python --version`                                                                    |
-| Create virtual environment           | `uv venv sbom-env`                                                                    |
-| Install pipgrip                      | `uv pip install --upgrade pip pipgrip `                                               |
-| Generate flattened dependency file   | `uv pip compile --all-extras pyproject.toml -o all-dep.txt`                           |
-| Generate dependency tree             | `pipgrip --tree-json-exact -r all-dep.txt > dets.json`                                |
-| Normalize dependencies               | `python dep_convert.py`                                                               |
-| Install CycloneDX & generate SBOM    | `uv pip install cyclonedx-bom`<br>`cyclonedx-py requirements all-dep.txt -o sbom.json`|
-| Remove virtual environment           | `python -c "import shutil; shutil.rmtree('<venv_path>')"`                             |
-
-
-# 2. Features of golang
-
-- This repository provides a **Go pipeline** to handle dependency management and SBOM generation efficiently.
-- It gave multiple sbom's for one project if it has multiple modules.
-- And also it gave multiple dependency tree's for one project if it has multiple modules.
-- And also it compare each module's sbom with dependency tree and gave a comparison report.
-
-## Go Project SBOM & Dependency Tree Auto-Generation
-
-This project automates the generation of:
-- **Dependency Tree** using [`deptree`](https://github.com/vc60er/deptree)
-- **CycloneDX SBOM (Software Bill of Materials)** using [`cyclonedx-gomod`](https://github.com/CycloneDX/cyclonedx-gomod)
-- **Comparison Report** between the dependency tree and SBOM
-
-The flow is designed to:
-1. Clone a given Go project repository.
-2. Detect Go modules.
-3. Prepare dependencies and run `go mod tidy`.
-4. Generate the dependency tree in JSON format.
-5. Generate CycloneDX SBOM for each module.
-6. Compare results and produce a report.
-
-### 1. Install Go
-Make sure Go is installed and available in your `PATH`.
+example to generate sbom from url
 
 ```bash
-go version
+📂 Enter GitHub raw URL or local package file path: path or raw file link
 ```
 
-### 2. Install Python (for orchestration scripts)
-Ensure Python ≥3.8 is installed.
+### Using the API
 
+1. **Generate SBOM from URL**:
 ```bash
-python --version
+curl -X POST "http://localhost:8000/generate_sbom" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_input": "https://raw.githubusercontent.com/user/repo/branch/requirements.txt",
+    "id": "custom_id"
+  }'
 ```
 
-### 3. Install CycloneDX for Go
-Install the CycloneDX Go module generator:
+2. **Generate SBOM from Local File**:
 ```bash
-go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@latest
+curl -X POST "http://localhost:8000/generate_sbom" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source_input": "C:\\Projects\\my-project\\requirements.txt",
+    "id": "custom_id"
+  }'
 ```
-### 4. Install Deptree
-Install the dependency tree generator:
+
+3. **Upload File Directly**:
 ```bash
-go install github.com/vc60er/deptree@latest
-```
-- Both binaries (cyclonedx-gomod and deptree) must be in your GOPATH/bin or system PATH.
-
-## 📝 Commands Used Internally
-
-Here are the key shell commands executed by the scripts:
-
-| Step                     | Command                                               |
-|--------------------------|-------------------------------------------------------|
-| Clone repository         | `git clone <repo_url>`                                |
-| Checkout branch          | `git checkout <branch>`                               |
-| Prepare dependencies     | `go mod tidy`                                         |
-| Generate module graph    | `go mod graph`                                        |
-| Generate dependency tree | `deptree -json < graph_output > deps.json`            |
-| Generate CycloneDX SBOM  | `cyclonedx-gomod mod -json -output sbom.json .`       |
-
-
-# 2. Features of java-maven
-
-
-## Java-Maven Project SBOM & Dependency Tree Auto-Generation
-
-This project automates **SBOM (Software Bill of Materials) generation** for Maven-based Java projects and compares it against the Maven dependency tree. It supports multi-module Maven projects, generates JSON SBOMs, dependency tree JSONs, and a comparison report highlighting missing dependencies or version mismatches.
-
----
-
-## Features
-
-- Automatically detects Maven projects (`pom.xml`) in a GitHub repository.
-- Generates SBOM using **CycloneDX Maven plugin** in JSON format.
-- Generates Maven **dependency tree** (`dependency:tree`) and converts it into JSON.
-- Compares SBOM dependencies vs dependency tree:
-  - Lists dependencies **present only in SBOM**.
-  - Lists dependencies **present only in dependency tree**.
-  - Lists **version mismatches**.
-  - Lists **exact matches**.
-- Skips test/example/problematic POMs automatically.
-
----
-
-## Prerequisites
-
-- Python 3.12+
-- Maven installed and available in `PATH` (or `mvn` / `mvn.cmd` depending on OS)
-- Git installed
-- Internet connection to clone GitHub repositories
-
----
-
-## Setup
-
-1. Clone this repository:
-
-```bash
-git clone <this_repo_url>
-cd <this_repo_folder>
+curl -X POST "http://localhost:8000/upload_and_generate_sbom" \
+  -F "file=@C:\\Projects\\my-project\\requirements.txt" \
+  -F "id=custom_id"
 ```
 
-2. Ensure required Python dependencies are installed (if any, e.g., for optional modules like os_detect).
+## 📋 Prerequisites
 
-3. Ensure Maven is installed and working:
-```bash 
-    mvn -v
+### General Requirements
+- Python 3.11+
+- Docker (optional)
+- Git (for GitHub URLs)
+
+### Language-Specific Tools
+- **Python**: `uv`, `pipgrip`, `cyclonedx-bom`
+- **Java**: Maven
+- **Go**: `cyclonedx-generator`, `jq`
+
+
+## 📁 Output Structure
+
+The tool creates a unique folder for each SBOM generation request:
+```
+<sbom_id>/
+├── python_sbom_1.json    # Python SBOM
+├── java_sbom_1.json     # Java SBOM
+├── go_sbom_1.json       # Go SBOM
+├── *_deps_*.json        # Dependency trees
+└── *_comparison_*.txt   # Comparison reports
 ```
 
-### The script will:
+## 🔍 Error Handling
 
-- Detect the operating system.
-- Clone the repository and checkout the specified branch.
-- Detect programming languages and dependency managers.
-- For Maven modules:
+- Invalid URLs or paths return 400 Bad Request
+- Unsupported file types are rejected
+- Network issues are reported with appropriate error messages
+- Missing dependencies trigger installation attempts
 
-- Validate pom.xml files.
+## 📚 API Reference
 
-    Generate SBOM JSON via CycloneDX Maven plugin.
-    Generate dependency tree JSON.
-    Compare SBOM vs dependency tree and generate a comparison report.
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/generate_sbom` | POST | Generate from URL/path |
+| `/upload_and_generate_sbom` | POST | Generate from upload |
+| `/generate_sbom/{sbom_id}` | GET | Retrieve SBOM |
+| `/generate_sbom/{sbom_id}` | DELETE | Remove SBOM |
 
-### Example Commands
+## 🤝 Contributing
 
-## 📝 Commands Used Internally
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
-Here are the key shell commands executed by the scripts for Maven projects:
+## 📄 License
 
-| Step                     | Command                                                                                              |
-|--------------------------|------------------------------------------------------------------------------------------------------|
-| Clone repository         | `git clone <repo_url>`                                                                               |
-| Checkout branch          | `git checkout <branch>`                                                                              |
-| Generate CycloneDX SBOM  | `mvn org.cyclonedx:cyclonedx-maven-plugin:2.9.1:makeAggregateBom -DoutputFormat=json -DoutputDirectory=<output_dir> -DoutputName=<sbom_file>` |
-| Generate dependency tree | `mvn dependency:tree -DoutputFile=<deps_file>`                                                      |
-| Parse dependency tree    | `python parse_gradle_dependencies.py <deps_file> <deps_json_file>` (internal Python parsing step)   |
-| Compare SBOM vs tree     | `python maven_compare.py <sbom_file> <deps_json_file> <comparison_file>`                             |
-
+This project is licensed under the MIT License - see the LICENSE file for details.
